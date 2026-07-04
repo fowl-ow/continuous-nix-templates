@@ -137,7 +137,10 @@
 
           shell = {
             inherit (cfg) env;
-            packages = [ pkgs.apacheHttpd ];
+            packages = [
+              pkgs.apacheHttpd
+              pkgs.imagemagick
+            ];
             hook = ''
               echo "🐘 PHP ${config.lang.php.package.version} dev shell — https://${cfg.hostname} (backend :${toString cfg.port})"
               echo "   up (detached) · attach (TUI) · down"
