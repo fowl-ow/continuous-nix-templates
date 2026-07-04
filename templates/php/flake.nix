@@ -4,7 +4,6 @@
   inputs = {
     continuous-nix-templates.url = "github:fowl-ow/continuous-nix-templates";
     nixpkgs.follows = "continuous-nix-templates/nixpkgs";
-    flake-parts.follows = "continuous-nix-templates/flake-parts";
     # required: the capability modules resolve this against *this* flake's inputs
     process-compose-flake.follows = "continuous-nix-templates/process-compose-flake";
   };

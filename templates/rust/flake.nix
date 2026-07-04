@@ -5,7 +5,6 @@
     continuous-nix-templates.url = "github:fowl-ow/continuous-nix-templates";
     nixpkgs.follows = "continuous-nix-templates/nixpkgs";
     rust-overlay.follows = "continuous-nix-templates/rust-overlay";
-    flake-parts.follows = "continuous-nix-templates/flake-parts";
     # required even without web processes: the bundle's stack module resolves
     # this against *this* flake's inputs
     process-compose-flake.follows = "continuous-nix-templates/process-compose-flake";
