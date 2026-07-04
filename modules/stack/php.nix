@@ -133,7 +133,7 @@
           lang.php.enable = lib.mkDefault true;
           lang.node.enable = lib.mkDefault true;
 
-          stack.id = lib.mkDefault cfg.hostname;
+          process.id = lib.mkDefault cfg.hostname;
 
           shell = {
             inherit (cfg) env;
@@ -144,7 +144,7 @@
             '';
           };
 
-          stack.processes = {
+          processes = {
             php-fpm = {
               command = ''
                 mkdir -p ${runDir}

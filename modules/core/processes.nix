@@ -16,12 +16,10 @@
   perSystem =
     { config, pkgs, ... }:
     let
-      cfg = config.processes;
-
       # process-compose control socket; directly in /tmp because the server
       # binds it before any process could `mkdir -p` a run dir, and unix
       # socket paths are limited to ~104 chars
-      pcSocket = "/tmp/processes-${cfg.id}.sock";
+      pcSocket = "/tmp/processes-${config.process.id}.sock";
 
       # Quick commands, on PATH only while inside this project's dev shell
       # (direnv adds/removes them with the directory). The socket is baked
@@ -37,8 +35,9 @@
       '';
     in
     {
-      options.processes = {
-        id = lib.mkOption {
+      # plural = the set of process definitions, singular = instance settings
+      options = {
+        process.id = lib.mkOption {
           type = lib.types.str;
           description = "Instance id for the control socket path (usually the project hostname)";
         };
@@ -50,13 +49,13 @@
         };
       };
 
-      config = lib.mkIf (cfg.processes != { }) {
+      config = lib.mkIf (config.processes != { }) {
         process-compose."up" = {
           cli.options = {
             use-uds = true;
             unix-socket = pcSocket;
           };
-          settings.processes = cfg.processes;
+          settings.processes = config.processes;
         };
 
         shell.packages = [
