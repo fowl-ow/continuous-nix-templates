@@ -10,20 +10,30 @@
     "x86_64-linux"
   ];
 
-  # Exported language modules live in ../flakeModules, NOT in modules/:
-  # everything under modules/ is auto-imported into THIS repo's own flake
-  # (import-tree), and the language modules must only apply to consumer
-  # projects — applied here they'd collide on devShells.default and require
-  # per-project options like web.hostname.
   flake = {
-    flakeModules.rust = ../flakeModules/rust.nix;
-    flakeModules.php = ../flakeModules/php.nix;
+    # One bundle with every capability module; consumers import it and flip
+    # enable switches (web.enable, lang.rust.enable, ...). Because every
+    # effect is enable-gated, the same files can also be auto-imported into
+    # THIS repo's own flake (import-tree at the flake root) without
+    # colliding — the repo itself just gets an empty default dev shell.
+    flakeModules.default = inputs.import-tree [
+      ./core
+      ./lang
+      ./stack
+    ];
 
     # starters for `nix flake init -t github:fowl-ow/continuous-nix-templates#<name>`
     templates = {
       rust = {
         path = ../templates/rust;
         description = "Rust project (rust-overlay toolchain, central nixpkgs)";
+        welcomeText = ''
+          # Next steps
+
+          1. Enable + configure lang.rust in flake.nix
+          2. Add flake.nix and .envrc to git
+          3. `direnv allow`
+        '';
       };
       php = {
         path = ../templates/php;
@@ -31,10 +41,10 @@
         welcomeText = ''
           # Next steps
 
-          1. Set hostname + php version in flake.nix
+          1. Enable + configure web in flake.nix (hostname, php version)
           2. Add flake.nix and .envrc to git
           3. `direnv allow`
-          4. `up` (or `up -D` for background, `down` to stop)
+          4. `up` (detached; `attach` for the TUI, `down` to stop)
         '';
       };
     };

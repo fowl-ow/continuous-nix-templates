@@ -6,6 +6,9 @@
     nixpkgs.follows = "continuous-nix-templates/nixpkgs";
     rust-overlay.follows = "continuous-nix-templates/rust-overlay";
     flake-parts.follows = "continuous-nix-templates/flake-parts";
+    # required even without web processes: the bundle's stack module resolves
+    # this against *this* flake's inputs
+    process-compose-flake.follows = "continuous-nix-templates/process-compose-flake";
   };
 
   outputs =
@@ -16,7 +19,7 @@
     }:
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [
-        continuous-nix-templates.flakeModules.rust
+        continuous-nix-templates.flakeModules.default
       ];
 
       systems = [
@@ -24,8 +27,9 @@
         "x86_64-linux"
       ];
 
-      perSystem = { config, ... }: {
-        # rust.channel = "nightly";   # uncomment for nightly
+      perSystem = _: {
+        lang.rust.enable = true;
+        # lang.rust.channel = "nightly";   # uncomment for nightly
       };
     };
 }

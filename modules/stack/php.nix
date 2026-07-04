@@ -1,35 +1,26 @@
 #
-# PHP web project module: pinned PHP dev shell + a process-compose app
-# (`nix run .#up`) running php-fpm + per-project Apache. On start it
-# registers its hostname with the machine-global Caddy reverse proxy
-# (~/.config/nix web-stack module) by dropping a vhost fragment into
-# ~/.local/state/web-stack/caddy/vhosts and reloading Caddy; on stop it
-# deregisters again. Reachable at https://<hostname> (Caddy terminates TLS).
+# PHP web stack: php-fpm + a per-project Apache, run as `stack` processes
+# (`up` / `nix run .#up`). On start it registers its hostname with the
+# machine-global Caddy reverse proxy (~/.config/nix php-stack module) by
+# dropping a vhost fragment into ~/.local/state/php-stack/caddy/vhosts and
+# reloading Caddy; on stop it deregisters again. Reachable at
+# https://<hostname> (Caddy terminates TLS).
 #
-{ lib, inputs, ... }:
+# Enabling this soft-enables lang.php and lang.node (override with
+# `lang.node.enable = false;` etc.); the PHP that fpm runs is
+# lang.php.finalPackage, so `lang.php.package = pkgs.php84;` picks the
+# version.
+#
+{ lib, ... }:
 {
-  imports = [
-    inputs.process-compose-flake.flakeModule
-    ./template-hooks.nix
-  ];
-
   perSystem =
     { config, pkgs, ... }:
     let
-      cfg = config.web;
+      cfg = config.stack.php;
     in
     {
-      options.web = {
-        # Base package only — the shared extension set and ini config are
-        # layered on via buildEnv below. For a version nixpkgs has dropped
-        # (e.g. php81, removed 2025-10), add a flake input pinned to an older
-        # nixpkgs revision and pass its php81 here.
-        php = lib.mkOption {
-          type = lib.types.package;
-          default = pkgs.php;
-          defaultText = "pkgs.php";
-          description = "Base PHP package for this project, e.g. pkgs.php83";
-        };
+      options.stack.php = {
+        enable = lib.mkEnableOption "the PHP web stack (php-fpm + Apache behind the global Caddy)";
 
         hostname = lib.mkOption {
           type = lib.types.str;
@@ -61,53 +52,16 @@
           default = { };
           description = "Environment variables for the dev shell and the services";
         };
-
-        node = lib.mkOption {
-          type = lib.types.package;
-          default = pkgs.nodejs_24;
-          defaultText = "pkgs.nodejs_24";
-          description = "Node.js package for the frontend build";
-        };
       };
 
-      config =
+      config = lib.mkIf cfg.enable (
         let
-          php = cfg.php.buildEnv {
-            extensions =
-              { enabled, all }:
-              enabled
-              ++ (with all; [
-                apcu
-                imagick
-                xdebug
-              ]);
-            # xdebug stays off unless XDEBUG_MODE=debug is set at runtime
-            extraConfig = ''
-              memory_limit = 512M
-              xdebug.mode = off
-            '';
-          };
+          php = config.lang.php.finalPackage;
 
           # Runtime scratch space (fpm socket, httpd pid). Keyed by hostname,
           # kept short: unix socket paths are limited to ~104 chars.
-          runDir = "/tmp/web-stack-${cfg.hostname}";
+          runDir = "/tmp/php-stack-${cfg.hostname}";
           fpmSock = "${runDir}/php-fpm.sock";
-          # process-compose control socket; directly in /tmp because the
-          # server binds it before any process gets to `mkdir -p runDir`
-          pcSocket = "/tmp/web-stack-${cfg.hostname}.sock";
-
-          # Quick commands, on PATH only while inside this project's dev
-          # shell (direnv adds/removes them with the directory). The socket
-          # is baked in so they always target this project's instance.
-          upCmd = pkgs.writeShellScriptBin "up" ''
-            exec ${config.process-compose."up".outputs.package}/bin/up -D "$@"
-          '';
-          downCmd = pkgs.writeShellScriptBin "down" ''
-            exec ${pkgs.process-compose}/bin/process-compose down -U -u ${pcSocket} "$@"
-          '';
-          attachCmd = pkgs.writeShellScriptBin "attach" ''
-            exec ${pkgs.process-compose}/bin/process-compose attach -U -u ${pcSocket} "$@"
-          '';
 
           envList = lib.mapAttrsToList (k: v: "${k}=${v}") cfg.env;
 
@@ -176,42 +130,21 @@
           '';
         in
         {
-          devShells.default = pkgs.mkShell {
-            packages = [
-              php
-              php.packages.composer
-              cfg.node
-              pkgs.apacheHttpd
-              pkgs.process-compose
-              upCmd
-              downCmd
-              attachCmd
-            ];
-            # PC_SOCKET_PATH lets down/attach find this project's instance
-            env =
-              cfg.env
-              // config.templateHooks.env
-              // {
-                PC_SOCKET_PATH = pcSocket;
-              };
-            shellHook = ''
-              echo "🐘 PHP ${cfg.php.version} dev shell — https://${cfg.hostname} (backend :${toString cfg.port})"
-              echo "   up (foreground TUI) · up -D (background) · down · attach"
+          lang.php.enable = lib.mkDefault true;
+          lang.node.enable = lib.mkDefault true;
+
+          stack.id = lib.mkDefault cfg.hostname;
+
+          shell = {
+            inherit (cfg) env;
+            packages = [ pkgs.apacheHttpd ];
+            hook = ''
+              echo "🐘 PHP ${config.lang.php.package.version} dev shell — https://${cfg.hostname} (backend :${toString cfg.port})"
+              echo "   up (detached) · attach (TUI) · down"
             '';
           };
 
-          # control via a per-project unix socket instead of the TCP server
-          # (which defaults to 127.0.0.1:8080 and collides with e.g.
-          # OrbStack). This also enables background runs:
-          #   nix run .#up -- -D        start detached
-          #   process-compose attach -U  view the TUI of a detached run
-          #   process-compose down -U    stop everything (deregisters vhost)
-          process-compose."up".cli.options = {
-            use-uds = true;
-            unix-socket = pcSocket;
-          };
-
-          process-compose."up".settings.processes = {
+          stack.processes = {
             php-fpm = {
               command = ''
                 mkdir -p ${runDir}
@@ -235,8 +168,8 @@
             # TERM on `down`/Ctrl-C).
             caddy-register = {
               command = ''
-                vhost="$HOME/.local/state/web-stack/caddy/vhosts/${cfg.hostname}.caddy"
-                caddyfile="$HOME/.local/state/web-stack/Caddyfile"
+                vhost="$HOME/.local/state/php-stack/caddy/vhosts/${cfg.hostname}.caddy"
+                caddyfile="$HOME/.local/state/php-stack/Caddyfile"
                 reload() {
                   ${pkgs.caddy}/bin/caddy reload --config "$caddyfile" --adapter caddyfile || true
                 }
@@ -258,6 +191,7 @@
               depends_on.httpd.condition = "process_started";
             };
           };
-        };
+        }
+      );
     };
 }
