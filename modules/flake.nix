@@ -17,5 +17,6 @@
   # per-project options like web.hostname.
   flake = {
     flakeModules.rust = ../flakeModules/rust.nix;
+    flakeModules.php = ../flakeModules/php.nix;
   };
 }
