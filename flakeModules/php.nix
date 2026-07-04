@@ -100,7 +100,7 @@
           # shell (direnv adds/removes them with the directory). The socket
           # is baked in so they always target this project's instance.
           upCmd = pkgs.writeShellScriptBin "up" ''
-            exec ${config.process-compose."up".outputs.package}/bin/up "$@"
+            exec ${config.process-compose."up".outputs.package}/bin/up -D "$@"
           '';
           downCmd = pkgs.writeShellScriptBin "down" ''
             exec ${pkgs.process-compose}/bin/process-compose down -U -u ${pcSocket} "$@"
