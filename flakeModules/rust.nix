@@ -7,6 +7,8 @@ let
   ];
 in
 {
+  imports = [ ./template-hooks.nix ];
+
   perSystem = { config, system, ... }: {
     options.rust.channel = lib.mkOption {
       type = rustChannelType;
@@ -46,6 +48,8 @@ in
           packages = [
             rustToolchain
           ];
+
+          env = config.templateHooks.env;
 
           shellHook = ''
             echo "🦀 Rust dev shell (${rustChannel})"

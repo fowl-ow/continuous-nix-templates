@@ -8,7 +8,10 @@
 #
 { lib, inputs, ... }:
 {
-  imports = [ inputs.process-compose-flake.flakeModule ];
+  imports = [
+    inputs.process-compose-flake.flakeModule
+    ./template-hooks.nix
+  ];
 
   perSystem =
     { config, pkgs, ... }:
@@ -185,9 +188,12 @@
               attachCmd
             ];
             # PC_SOCKET_PATH lets down/attach find this project's instance
-            env = cfg.env // {
-              PC_SOCKET_PATH = pcSocket;
-            };
+            env =
+              cfg.env
+              // config.templateHooks.env
+              // {
+                PC_SOCKET_PATH = pcSocket;
+              };
             shellHook = ''
               echo "🐘 PHP ${cfg.php.version} dev shell — https://${cfg.hostname} (backend :${toString cfg.port})"
               echo "   up (foreground TUI) · up -D (background) · down · attach"
