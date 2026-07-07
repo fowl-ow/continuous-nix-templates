@@ -47,6 +47,17 @@
           4. `up` (detached; `attach` for the TUI, `down` to stop)
         '';
       };
+      python = {
+        path = ../templates/python;
+        description = "Python project (uv)";
+        welcomeText = ''
+          # Next steps
+
+          1. Add flake.nix and .envrc to git
+          2. `direnv allow`
+          3. `uv sync` to install dependencies (including ruff and pyright)
+        '';
+      };
     };
   };
 }
